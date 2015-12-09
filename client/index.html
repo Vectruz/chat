@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html ng-app="chat">
+<head>
+	<meta charset="UTF-8">
+	<title>Chat</title>
+	<link rel="stylesheet" type="text/css" href="bower_components/bootstrap/dist/css/bootstrap.css">
+	<link rel="stylesheet" type="text/css" href="bower_components/font-awesome/css/font-awesome.css">
+	<script src="bower_components/angular/angular.js"></script>
+	<script src="bower_components/socket.io-client/socket.io.js"></script>
+	<script>
+
+		var Context = {
+			canvas: null,
+			context: null,
+			create: function (canvas_tag_id) {
+				this.canvas = document.getElementById(canvas_tag_id);
+				this.context = this.canvas.getContext('2d');
+				return this.context;
+			}
+		};
+
+		var Sprite = function(filename, is_pattern) {
+			this.image = null;
+			this.pattern = null;
+			this.TO_RADIANS = Math.PI/180;
+
+			if (filename) {
+				this.image = new Image();
+				this.image.src = filename;
+				if (is_pattern) {
+					this.pattern = Context.context.createPattern(this.image, 'repeat');
+				};
+			} else {
+				console.log('Unable to load sprite.');
+			};
+
+			this.draw = function (x, y, w, h) {
+				if (this.pattern) {
+					Context.context.fillStyle = this.pattern;
+					Context.context.fillRect(x, y, w, h);
+				} else {
+					if (!w || !h) {
+						Context.context.drawImage(this.image, x, y, this.image.width, this.image.height);
+					} else {
+						Context.context.drawImage(this.image, x, y, w, h);
+					}
+				}
+			};
+
+			/*this.rotate = function(x, y, angle) {
+				Context.context.save();
+				Context.context.translate(x, y);
+				Context.context.rotate(angle * this.TO_RADIANS);
+				Context.context.drawImage(this.image, - (this.image.width/2) - (this.image.height/2));
+				Context.context.restore();
+			}*/
+		};
+
+		function initializeWebGL() {
+
+			Context.create('canvas');
+
+			var WALL = 'http://www.tigrisgames.com/wall.png';
+			var CRATE = 'http://www.tigrisgames.com/crate.png';
+
+			var image = new Sprite(WALL, false);
+			var image2 = new Sprite(CRATE, false);
+			var pattern = new Sprite(CRATE, true);
+			var angle = 0;
+
+			setInterval(function () {
+				Context.context.fillStyle = '#000000';
+				Context.context.fillRect(0, 0, 800, 800);
+				image.draw(0,0,64,64);
+				image.draw(0,74,256,32);
+				pattern.draw(160,160,256,180);
+
+				//image.rotate(115,160, angle += 4.0);
+				//image2.rotate(115,260,-angle/2);
+
+			}, 100)
+
+			Context.context.beginPath();
+			Context.context.rect(0, 0, 640, 480);
+			Context.context.fillStyle = 'black';
+			Context.context.fill();
+
+			/*
+			var canvas = document.getElementById('canvas');
+
+			var gl = canvas.getContext('webgl') ||
+					 canvas.getContext('experimental-webgl') ||
+					 canvas.getContext('moz-webgl') ||
+					 canvas.getContext('webkit-3d');
+
+			if (gl) {
+				var extensions = gl.getSupportedExtensions();
+				console.log(gl);
+				console.log(extensions);
+
+				gl.viewportWidth = canvas.width;
+				gl.viewportHeight = canvas.height;
+
+				gl.clearColor( 0, 0, 0, 1);
+				gl.clear(gl.COLOR_BUFFER_BIT);
+
+			} else {
+				console.log('Your browser doesn\'t support OpenGl');
+			};
+			*/
+
+		};
+
+		var socket = io();
+		angular.module("chat", []);
+		angular.module("chat").directive("autoScroll", function () {
+			return {
+				scope: {
+					autoScroll: "="
+				},
+				link: function (scope, element) {
+					scope.$watchCollection("autoScroll", function () {
+						element[0].scrollTop = element[0].scrollHeight;
+					});
+				}
+			};
+		});
+		angular.module("chat").controller("chatCtrl", function ($scope, $http, $interval) {
+			$scope.app = "Chat";
+			$scope.messages = [];
+
+			socket.on("message", function (data) {
+				$scope.$apply(function () {
+					$scope.messages.push(data);
+				});
+			});
+
+			socket.on("socket", function (data) {
+				$scope.$apply(function () {
+					$scope.socket = data;
+				});
+			});
+
+			socket.on('users', function (data) {
+				$scope.users = data;
+			});
+
+			$scope.connect = function () {
+				$scope.connected = true;
+				socket.emit("join", {
+					channel: $scope.channel,
+					nickname: $scope.nickname
+				});
+			};
+
+			$scope.send = function (message, $event) {
+				if ($event.keyCode !== 13) return;
+				var _message = {
+					date: new Date(),
+					nickname: $scope.nickname,
+					message: message};
+				socket.emit("message", _message);
+				delete $scope.message;
+			};
+		})
+	</script>
+	<style>
+		.main {
+			background-color: #AAA;
+			margin-top: 50px;
+			margin-left: auto;
+			margin-right: auto;
+			width: 600px;
+			padding: 20px;
+		}
+
+		.messages {
+			margin-top: 20px;
+			height: 200px;
+			overflow: auto;
+		}
+	</style>
+</head>
+<body ng-controller="chatCtrl" onload="initializeWebGL();">
+	<div class="col-lg-6">
+		<canvas id="canvas" width="640" height="480" style="border: 1px solid gray; width: 640px; height: 480px;">
+			
+		</canvas>
+	</div>
+	<div class="main col-lg-6">
+		<h2 class="text-center"><span class="fa fa-comments"></span> {{app}}</h2>
+		<div ng-hide="connected">
+			<input class="form-control" type="text" ng-model="nickname" placeholder="Tell me your nickname..."/>
+			<input class="form-control" type="text" ng-model="channel" placeholder="Channel"/>
+			<br/>
+			<div class="text-right">
+				<button class="btn btn-success" ng-click="connect()">Connected</button>
+			</div>
+		</div>
+		<div ng-show="connected">
+			<div class="row">
+				<div class="panel panel-default panel-body text-left col-lg-4">
+					<h4>Users at Channel {{channel}}</h4>
+				</div>
+				<div class="panel panel-default panel-body text-left col-lg-8" auto-scroll="messages">
+					<h4>Messages</h4>
+				</div>
+			</div>
+			<div class="row">
+				<div class="panel panel-default panel-body messages text-left col-lg-4">
+					<div ng-repeat="user in users" ng-if="user.channel === channel">
+						{{user.name}} <span ng-if="user.name === nickname"> - ME HERE</span>
+					</div>
+				</div>
+				<div class="panel panel-default panel-body messages text-left col-lg-8" auto-scroll="messages">
+					<div ng-repeat="message in messages">
+						<b>[{{message.date | date:'dd/MM/yyyy HH:mm'}}] {{message.nickname}} -</b> {{message.message}}
+					</div>
+				</div>
+			</div>
+			<input class="form-control" type="text" ng-model="nickname" placeholder="Type your nickname..." ng-keyup="send(message, $event)"/>:<input class="form-control" type="text" ng-model="message" placeholder="Type your message..." ng-keyup="send(message, $event)"/>
+		</div>
+	</div>
+</body>
+</html>
