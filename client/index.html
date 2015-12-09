@@ -47,13 +47,13 @@
 				}
 			};
 
-			/*this.rotate = function(x, y, angle) {
+			this.rotate = function(x, y, angle) {
 				Context.context.save();
 				Context.context.translate(x, y);
 				Context.context.rotate(angle * this.TO_RADIANS);
-				Context.context.drawImage(this.image, - (this.image.width/2) - (this.image.height/2));
+				Context.context.drawImage(this.image, -(this.image.width/2), -(this.image.height/2));
 				Context.context.restore();
-			}*/
+			}
 		};
 
 		function initializeWebGL() {
@@ -75,8 +75,8 @@
 				image.draw(0,74,256,32);
 				pattern.draw(160,160,256,180);
 
-				//image.rotate(115,160, angle += 4.0);
-				//image2.rotate(115,260,-angle/2);
+				image.rotate(115,160, angle += 4.0);
+				image2.rotate(115,260,-angle/2);
 
 			}, 100)
 
